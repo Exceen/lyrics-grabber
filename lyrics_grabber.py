@@ -6,6 +6,8 @@ import re
 
 iTunes = SBApplication.applicationWithBundleIdentifier_("com.apple.Music")
 
+mediaKindMusic = 1800234067
+
 # enter artist
 # (enter album name)
 # (enter track)
@@ -39,7 +41,7 @@ def get_tracks(iTunes):
     query = raw_input('Artist: ')
     query_tracks = []
     for track in iTunes.tracks():
-        if query in track.artist():
+        if track.mediaKind() == mediaKindMusic and query in track.artist():
             if len(track.lyrics()) == 0:
                 query_tracks.append(track)
     return query_tracks
