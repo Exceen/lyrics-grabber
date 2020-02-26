@@ -40,12 +40,14 @@ def get_tracks(iTunes):
     query_tracks = []
     for track in iTunes.tracks():
         if query in track.artist():
-            query_tracks.append(track)
+            if len(track.lyrics()) == 0:
+                query_tracks.append(track)
     return query_tracks
 
 def prepare_for_url(s):
     s = s.lower()
     s = s.replace(' ', '')
+    s = re.sub('[\W_]+', '', s)
     return s
 
 def clean_raw_html(raw_html):
@@ -81,16 +83,17 @@ def choose_tracks():
         print i, album
         i += 1
 
-    chosen_album_index = int(raw_input('Choose an album (leave empty for all): '))
+    chosen_album_index = raw_input('Choose an album (leave empty for all): ')
     all_albums = chosen_album_index == ''
 
     if all_albums:
         queried_tracks = []
         for album in albums:
             for track in album_map[album]:
-                queried_tracks.append(track)
+                if len(track.lyrics()) == 0:
+                    queried_tracks.append(track)
     else:
-        queried_tracks = album_map[albums[chosen_album_index]]
+        queried_tracks = album_map[albums[int(chosen_album_index)]]
 
     return queried_tracks
 
