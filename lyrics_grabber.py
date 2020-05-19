@@ -8,102 +8,106 @@ iTunes = SBApplication.applicationWithBundleIdentifier_("com.apple.Music")
 
 mediaKindMusic = 1800234067
 
-# enter artist
-# (enter album name)
-# (enter track)
-# check if website has lyrics
-# write lyrics to songs, do not overwrite
-# compare with lyrics from other website and note it somewhere that lyrics differ
+prefixes = ['The', 'A', '\.'] #regex
+
+# TODO:
+#    compare with lyrics from other website and note it somewhere that lyrics differ
 
 def find_and_set_lyrics(tracks):
     for track in tracks:
-        if len(track.lyrics()) == 0:
-            __find_and_set_lyrics(track)
-        else:
-            print 'Skipping', track.name()
+        __find_and_set_lyrics(track)
 
 def __find_and_set_lyrics(track):
     try:
         print 'Retrieving lyrics for "' + str(track.name()) + '"'
         lyrics = get_lyrics_for_track(track)
-        track.setLyrics_(lyrics)
-        # print '-'*10
-        # print lyrics
-        # print (('-'*20) + '\n')*3        
+        track.setLyrics_(lyrics) 
     except Exception as e:
         print e
 
 def load(url):
-    req = urllib2.Request(url, headers={'User-Agent': 'lyrics browser'})
+    req = urllib2.Request(url, headers = {
+        'Accept': '*/*',
+        'Connection': 'keep-alive',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,like Gecko) Chrome/68.0.3440.75 Safari/537.36',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Language': 'en-US;q=0.5,en;q=0.3',
+        'Cache-Control': 'max-age=0',
+        'DNT': '1',
+        'Upgrade-Insecure-Requests': '1'
+        })
     return urllib2.urlopen(req).read()
 
+def binary_search(arr, target):
+    return __binary_search(arr, 0, len(arr), target)
 
-def binary_search(arr, target, considerPrefixes=False):
-    return __binary_search(arr, 0, len(arr), target, considerPrefixes)
-
-def __binary_search(arr, low, high, x, considerPrefixes=False):
-    prefixes = ['The', 'A', '\.'] #regex
-
-    x_wo_prefix = x
-    if considerPrefixes:
-        x_wo_prefix = remove_prefix(x_wo_prefix, prefixes)
-
+def __binary_search(arr, low, high, x):
     if high >= low: 
         mid = low + (high - low) / 2
 
-        if arr[mid].artist() == x or (x_wo_prefix != x and remove_prefix(arr[mid].artist(), prefixes) == x_wo_prefix):
-            return mid 
+        artist = remove_prefix(arr[mid].artist().lower(), prefixes)
+
+        # If element is present at the middle itself
+        if artist == x:
+            return mid
 
         # If element is smaller than mid, then it can only 
-        elif arr[mid].artist() > x or (x_wo_prefix != x and remove_prefix(arr[mid].artist(), prefixes) > x_wo_prefix): 
-            return __binary_search(arr, low, mid - 1, x, considerPrefixes) 
+        # be present in left subarray
+        elif artist > x:
+            return __binary_search(arr, low, mid - 1, x) 
+        # Else the element can only be present in right subarray     
+        return __binary_search(arr, mid + 1, high, x) 
 
-        # Else the element can only be present in right subarray 
-        else: 
-            return __binary_search(arr, mid + 1, high, x, considerPrefixes) 
-  
     else: 
         # Element is not present in the array 
-        if not considerPrefixes:
-            return binary_search(arr, x, True)
+        x_wo_prefix = remove_prefix(x, prefixes)
+        if x != x_wo_prefix:
+            return binary_search(arr, x_wo_prefix)
         return -1
 
 def remove_prefix(text, prefixes):
     for prefix in prefixes:
-        text = re.sub('^' + prefix + ' ?', '', text)
+        text = re.sub('^' + prefix.lower() + ' ?', '', text)
     return text
 
 def get_tracks(iTunes):
     query = ''
     while len(query) == 0:
-        query = raw_input('Artist: ')
+        query = raw_input('Artist: ').lower()
+
     query_tracks = []
     all_tracks = iTunes.tracks()
 
-    result = binary_search(all_tracks, query)
-    if result != -1:
+    full_search = raw_input('Do you want to make a full search? This takes much longer but includes searching by album artist as well (y/n): ').lower()
+    if full_search != 'y':
+        print 'Performing binary search... (fast)'
+        result = binary_search(all_tracks, query)
+        if result != -1:
 
-        start_idx = result
-        while all_tracks[start_idx].artist() == query:
-            start_idx -= 1
-        start_idx += 1
+            start_idx = result
+            while all_tracks[start_idx].artist().lower() == query:
+                start_idx -= 1
+            start_idx += 1
 
-        end_idx = result
-        while all_tracks[end_idx].artist() == query:
-            end_idx += 1
+            end_idx = result
+            while all_tracks[end_idx].artist().lower() == query:
+                end_idx += 1
 
 
-        for i in xrange(start_idx, end_idx):
-            track = all_tracks[i]
-            if track.mediaKind() == mediaKindMusic and len(track.lyrics()) == 0:
-                query_tracks.append(track)
+            for i in xrange(start_idx, end_idx):
+                track = all_tracks[i]
+                if track.mediaKind() == mediaKindMusic and len(track.lyrics()) == 0:
+                    query_tracks.append(track)
 
-    if len(query_tracks) == 0:
-        print 'Unable to find tracks via binary search. Searching iterative, this may take a while.'
+        if len(query_tracks) > 0:
+            return query_tracks
+        else:
+            print 'Unable to find any tracks via binary search. Searching iterative, this may take a while.'
 
-        for track in iTunes.tracks():
-            if track.mediaKind() == mediaKindMusic and len(track.lyrics()) == 0 and query in track.artist():
-                query_tracks.append(track)
+    print 'Performing full search...'
+    for track in iTunes.tracks():
+        if track.mediaKind() == mediaKindMusic and len(track.lyrics()) == 0 and (query in track.artist().lower() or query in track.albumArtist().lower()):
+            query_tracks.append(track)
     return query_tracks
 
 def prepare_for_url(s):
@@ -125,6 +129,13 @@ def get_lyrics_for_track(track):
     try:
         url = url_template % (prepare_for_url(track.artist()), prepare_for_url(track.name()))
         content = load(url)
+
+    # and open it to return a handle on the url
+    except urllib2.HTTPError as e:
+        if e.code == 403:
+            print 'Blocked by lyrics provider, try again later or try to enter captcha in your browser.'
+            print url
+            quit()
     except Exception as e:
         url = url_template % (prepare_for_url(track.artist().split('The')[1]), prepare_for_url(track.name()))
         content = load(url)
@@ -143,6 +154,7 @@ def choose_tracks():
 
     albums = album_map.keys()
 
+    print '-' * 10
     i = 0
     for album in albums:
         print i, album
@@ -155,12 +167,10 @@ def choose_tracks():
         queried_tracks = []
         for album in albums:
             for track in album_map[album]:
-                if len(track.lyrics()) == 0:
-                    queried_tracks.append(track)
+                queried_tracks.append(track)
+        return queried_tracks
     else:
-        queried_tracks = album_map[albums[int(chosen_album_index)]]
-
-    return queried_tracks
+        return album_map[albums[int(chosen_album_index)]]
 
 def main():
     if iTunes.isRunning():
@@ -171,9 +181,10 @@ def main():
             if len(item.album()) > longest_album_length:
                 longest_album_length = len(item.album())
 
+        print '-' * 10
         for item in queried_tracks:
             print item.artist(), '-', item.album().rjust(longest_album_length), '-', str(item.trackNumber()).ljust(2), '-', item.name()
-        search_right = raw_input('Tracks alright? (y/n): ')
+        search_right = raw_input('Tracks alright? (y/n): ').lower()
         if search_right != 'y':
             print 'Aborted.'
         else:
