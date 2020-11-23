@@ -3,6 +3,7 @@ from ScriptingBridge import SBApplication
 import tweepyutils
 import urllib2
 import re
+import time
 
 iTunes = SBApplication.applicationWithBundleIdentifier_("com.apple.Music")
 
@@ -17,11 +18,14 @@ def find_and_set_lyrics(tracks):
     for track in tracks:
         __find_and_set_lyrics(track)
 
+        # ddos detection protection
+        time.sleep(2)
+
 def __find_and_set_lyrics(track):
     try:
         print 'Retrieving lyrics for "' + str(track.name()) + '"'
         lyrics = get_lyrics_for_track(track)
-        track.setLyrics_(lyrics) 
+        track.setLyrics_(lyrics)
     except Exception as e:
         print e
 
@@ -30,7 +34,7 @@ def load(url):
         'Accept': '*/*',
         'Connection': 'keep-alive',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,like Gecko) Chrome/68.0.3440.75 Safari/537.36',
-        'Accept-Encoding': 'gzip, deflate, br',
+        # 'Accept-Encoding': 'gzip, deflate, br',
         'Accept-Language': 'en-US;q=0.5,en;q=0.3',
         'Cache-Control': 'max-age=0',
         'DNT': '1',
@@ -42,9 +46,15 @@ def binary_search(arr, target):
     return __binary_search(arr, 0, len(arr), target)
 
 def __binary_search(arr, low, high, x):
+    # print '-' * 10
+    # print high, low, high >= low
     if high >= low: 
         mid = low + (high - low) / 2
+        # print high, mid, low
 
+
+        # if low == high and low == mid:
+        #     return mid
         artist = remove_prefix(arr[mid].artist().lower(), prefixes)
 
         # If element is present at the middle itself
@@ -96,7 +106,7 @@ def get_tracks(iTunes):
 
             for i in xrange(start_idx, end_idx):
                 track = all_tracks[i]
-                if track.mediaKind() == mediaKindMusic and len(track.lyrics()) == 0:
+                if track.mediaKind() == mediaKindMusic and (track.lyrics() == None or len(track.lyrics()) == 0):
                     query_tracks.append(track)
 
         if len(query_tracks) > 0:
@@ -105,8 +115,11 @@ def get_tracks(iTunes):
             print 'Unable to find any tracks via binary search. Searching iterative, this may take a while.'
 
     print 'Performing full search...'
+    i = 1
     for track in iTunes.tracks():
-        if track.mediaKind() == mediaKindMusic and len(track.lyrics()) == 0 and (query in track.artist().lower() or query in track.albumArtist().lower()):
+        print str(i) + '/' + str(len(iTunes.tracks())), track.artist(), track.name()
+        i += 1
+        if track.mediaKind() == mediaKindMusic and (track.lyrics() == None or len(track.lyrics()) == 0) and (query in track.artist().lower() or query in track.albumArtist().lower()):
             query_tracks.append(track)
     return query_tracks
 
